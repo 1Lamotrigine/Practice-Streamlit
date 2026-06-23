@@ -73,6 +73,7 @@ if submit_btn and user_prompt:
                 ],
                 model="llama-3.1-8b-instant",
                 temperature=0.2,
+                response_format={"type": "json_object"}
             )
             raw_json = chat_completion.choices[0].message.content
             schedule = json.loads(raw_json)
