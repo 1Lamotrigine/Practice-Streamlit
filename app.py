@@ -26,7 +26,7 @@ st.markdown("""
 # --- ЗАГОЛОВОК (ПО ЦЕНТРУ) ---
 st.markdown("<div class='centered-header'><h1>⚖️ Lifestyle Balancer AI</h1><h3>Твой день под контролем искусственного интеллекта</h3></div>", unsafe_allow_html=True)
 
-# --- БЛОК МЕТРИК (Чтобы не было пусто) ---
+# --- БЛОК МЕТРИК ---
 total, work, health = db.get_stats()
 m_col1, m_col2, m_col3, m_col4 = st.columns(4)
 m_col1.metric("Всего задач", total)
@@ -38,10 +38,9 @@ m_col4.metric("Статус баланса", balance_score)
 st.divider()
 
 # --- ВВОД (СВЕРХУ) ---
-# Используем контейнер для центрирования поля ввода
 container = st.container()
 with container:
-    col1, col2, col3 = st.columns([1, 2, 1]) # Боковые колонки пустые для центрирования
+    col1, col2, col3 = st.columns([1, 2, 1]) # Центрируем поле ввода
     with col2:
         st.markdown("##### 💬 Расскажи ИИ о своих планах:")
         user_prompt = st.text_area(
@@ -60,7 +59,15 @@ st.markdown("<h4 style='text-align: center;'>🗓️ Твое персональ
 SYSTEM_PROMPT = """
 Ты — ИИ-агент управления временем. Распредели задачи пользователя по времени, 
 чередуя категории: "Работа/Учеба", "Быт/Рутина" и "Здоровье/Отдых".
-Ответь СТРОГО JSON-массивом объектов с полями time_slot, category, task_text.
+
+Ты ДОЛЖЕН ответить в формате JSON-объекта, где все задачи лежат внутри ключа "tasks".
+Пример формата:
+{
+  "tasks": [
+    {"time_slot": "09:00 - 11:00", "category": "Работа/Учеба", "task_text": "Разработка проекта"},
+    {"time_slot": "11:00 - 11:30", "category": "Здоровье/Отдых", "task_text": "Перерыв"}
+  ]
+}
 """
 
 if submit_btn and user_prompt:
@@ -73,19 +80,22 @@ if submit_btn and user_prompt:
                 ],
                 model="llama-3.1-8b-instant",
                 temperature=0.2,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"} # Заставляем Groq возвращать строгий JSON объект
             )
             raw_json = chat_completion.choices[0].message.content
-            schedule = json.loads(raw_json)
+            response_data = json.loads(raw_json)
+            
+            # Безопасно достаем список задач по ключу "tasks"
+            schedule = response_data.get("tasks", [])
+            
             db.save_schedule(schedule)
-            st.rerun() # Перезагружаем страницу, чтобы обновить метрики и список
+            st.rerun() # Перезагружаем интерфейс для обновления метрик и карточек
         except Exception as e:
             st.error(f"Ошибка ИИ: {e}")
 
 # Вывод списка задач в виде красивых карточек
 current_tasks = db.get_all_tasks()
 if current_tasks:
-    # Разделим на 3 колонки для красивой сетки
     t_col1, t_col2, t_col3 = st.columns(3)
     cols = [t_col1, t_col2, t_col3]
     
